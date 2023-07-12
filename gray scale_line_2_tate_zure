@@ -1,0 +1,45 @@
+import sensor, image, time, pyb
+
+sensor.reset()
+sensor.set_pixformat(sensor.GRAYSCALE)  # グレースケール形式に設定
+sensor.set_framesize(sensor.QVGA)
+sensor.skip_frames(time=2000)
+clock = time.clock()
+
+uart = pyb.UART(1, 115200, timeout=1000)
+uart.init(115200, bits=8, parity=None, stop=1)
+
+#thresholds = (225, 255)
+while True:
+    img = sensor.snapshot()
+    clock.tick()
+
+    lines = img.find_lines(
+        thresholds = 255,
+        pixels_threshold=25, area_threshold=10, merge=True,#grayscaleの閾値
+        threshold=5500,  # 直線の閾値
+        theta_margin=5,
+        #rho_margin=5,
+        #merge_distance=5,
+        #max_theta_diff=5
+    )
+
+
+    if len(lines) >= 2:
+        line1 = lines[0]
+        line2 = lines[1]
+
+        line1_center_x = (line1.x1() + line1.x2()) // 2
+        line2_center_x = (line2.x1() + line2.x2()) // 2
+
+        midpoint_x = (line1_center_x + line2_center_x) // 2
+        deviation_x = midpoint_x - img.width() // 2
+
+        img.draw_line(line1.line(), color=(255, 0, 0))
+        img.draw_line(line2.line(), color=(0, 255, 0))
+
+        print("中間点座標: ({})".format(midpoint_x))
+        print("中心からのずれ: {}" .format(deviation_x))
+        print( clock.fps())
+
+        uart.write(str(deviation_x).encode() + b'\n')
