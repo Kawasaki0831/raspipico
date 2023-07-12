@@ -1,0 +1,63 @@
+import sensor, image, time, pyb
+
+sensor.reset()
+sensor.set_pixformat(sensor.RGB565)
+sensor.set_framesize(sensor.QVGA)
+sensor.skip_frames(time=2000)
+clock = time.clock()
+
+uart = pyb.UART(1, 115200, timeout = 1000)
+uart.init(115200, bits=8, parity=None, stop=1)
+
+red_threshold = (20, 50, 40, 70, 5, 50) #あかいろの設定
+center_x = sensor.width() //2
+center_y = sensor.height() //2
+
+def find_horizontal_lines(img):
+    binary_image = img.binary([red_threshold])  #赤色しか認識しないカメラ設定
+    lines = binary_image.find_lines( threshold=10000, theta_margin=15, rho_margin=15 , merge_distance=20, max_theta_diff = 5)
+
+    horizontal_lines = []
+    for line in lines:
+        if abs(line.theta()) < 180:  # 横軸の直線を抽出
+            horizontal_lines.append(line)
+
+    # 直線を長さの降順でソート
+    horizontal_lines.sort(key=lambda line: line.length(), reverse=True)
+
+    return horizontal_lines[:2]  # 上位2本の直線を返す
+
+while True:
+    clock.tick()
+    img = sensor.snapshot()
+    lines = find_horizontal_lines(img)
+
+    for line in lines:
+        if len(lines) >= 2 :
+            # 最初の2本の直線を取得
+            line1 = lines[0]
+            line2 = lines[1]
+
+            # 直線の中心座標を計算
+            line1_center_x = (line1.x1() + line1.x2()) // 2
+            line2_center_x = (line2.x1() + line2.x2()) // 2
+            #line1_center_y = (line1.y1() + line1.y2()) // 2
+            #line2_center_y = (line2.y1() + line2.y2()) // 2
+
+            # 2本の直線の中間点の座標を計算
+            midpoint_x = (line1_center_x + line2_center_x) // 2
+            #midpoint_y = (line1_center_y + line2_center_y) // 2
+
+            deviation_x = midpoint_x - center_x  # 求めた値の中心座標からのずれ
+            #deviation_y = midpoint_y - center_y
+
+            # 2本の直線を描画
+            img.draw_line(line1.line(), color=(0, 255, 0))
+            img.draw_line(line2.line(), color=(0, 255, 0))
+
+            # 中間点の座標を表示
+            print("中間点座標: ({})".format(midpoint_x))
+            print("中心からのずれ: {}" .format(deviation_x))
+            print( clock.fps())
+
+            #uart.write(str(deviation_x).encode()+ b'\n')
