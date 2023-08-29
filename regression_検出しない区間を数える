@@ -42,7 +42,7 @@ while True:
             theta_left = line.theta()
 
         data_to_send = "ずれ: {} 角度: {} 検出しない区間: {}".format(x_zure, theta_left, gap_number)
-        uart.write(data_to_send .encode() + b'\n')  # データを文字列として送信
+        uart.write(str((x_zure, theta_left, gap_number)).encode() + b'\n')  # データを文字列として送信
 
         print("FPS %f, mag = %s, ずれ = %s, angle = %s" % (clock.fps(), str(line.magnitude()), x_zure, theta_left))
     else:
