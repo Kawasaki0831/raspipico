@@ -8,8 +8,8 @@ sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 clock = time.clock()
 
-THRESHOLD = (80, 150)
-sensor.set_auto_exposure(False, exposure_us=13000)
+THRESHOLD = (60, 250)
+sensor.set_auto_exposure(False, exposure_us=6000)
 sensor.set_auto_gain(False, gain_db=5)
 
 uart = pyb.UART(1, 115200, timeout=1000)
@@ -18,7 +18,7 @@ uart.init(115200, bits=8, parity=None, stop=1)
 space = 0
 
 line_pixel_sum_history = []  # 過去のline_pixel_sum値を保持するリスト
-HISTORY_LENGTH = 5  # 過去の値をいくつ保持するか
+HISTORY_LENGTH = 15  # 過去の値をいくつ保持するか
 
 gap_number = 0  # 検出しない区間の数
 prev_average_line_pixel_sum = 0  #average_line_pixel_sumの少し過去の値
@@ -36,14 +36,14 @@ while True:
         if line_pixel_sum == 0:
             space += 1
 
-            if space > 1000:
+            if space > 100000:
                 line_pixel_sum = 0
 
         else:
             line_pixel_sum = 1
             space = 0
 
-    print(line_pixel_sum)
+    #print(line_pixel_sum)
 
     line_pixel_sum_history.append(line_pixel_sum)  # 最新の line_pixel_sum をリストに追加
 
@@ -52,11 +52,11 @@ while True:
 
     # 過去の値の平均を計算
     average_line_pixel_sum = sum(line_pixel_sum_history) / len(line_pixel_sum_history)
-    print("abc:%d" % average_line_pixel_sum)
+    #print("abc:%f" % average_line_pixel_sum)
 
-    if prev_average_line_pixel_sum <= 0 and average_line_pixel_sum > 0:
+    if average_line_pixel_sum <= 0 and prev_average_line_pixel_sum > 0:
         gap_number += 1
-        print("変わり目の回数: %d" % gap_number)
+        #print("変わり目の回数: %d" % gap_number)
 
     prev_average_line_pixel_sum = average_line_pixel_sum
 
@@ -73,4 +73,5 @@ while True:
 
         uart.write(str((x_zure, theta_left, gap_number)).encode() + b'\n')  # データを文字列として送信
 
-        print("FPS %f, mag = %s, ずれ = %s, angle = %s" % (clock.fps(), str(line.magnitude()), x_zure, theta_left))
+        print(" ずれ = %s, angle = %s, number = %d" % ( x_zure, theta_left, gap_number))
+        #print("FPS %f" % clock.fps())
