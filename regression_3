@@ -8,9 +8,21 @@ sensor.set_framesize(sensor.QQVGA)
 sensor.skip_frames(time=2000)
 clock = time.clock()
 
-THRESHOLD = (60, 250)
-sensor.set_auto_exposure(False, exposure_us=6000)
-sensor.set_auto_gain(False, gain_db=5)
+THRESHOLD = (60, 250)          #研究室のすぐ近くの廊下で調整
+sensor.set_auto_exposure(False, exposure_us=5000)
+sensor.set_auto_gain(False, gain_db=3)
+
+#THRESHOLD = (60, 150)        #高専の2階で調整
+#sensor.set_auto_exposure(False, exposure_us=4700)
+#sensor.set_auto_gain(False, gain_db=3)
+
+#THRESHOLD = (80, 255)          #夢考房の3階で調整
+#sensor.set_auto_exposure(False, exposure_us=10000)
+#sensor.set_auto_gain(False, gain_db=5)
+
+#THRESHOLD = (50, 255)          #てかてかの体育館 --30cm
+#sensor.set_auto_exposure(False, exposure_us=650)
+#sensor.set_auto_gain(False, gain_db=2)
 
 uart = pyb.UART(1, 115200, timeout=1000)
 uart.init(115200, bits=8, parity=None, stop=1)
@@ -18,7 +30,7 @@ uart.init(115200, bits=8, parity=None, stop=1)
 space = 0
 
 line_pixel_sum_history = []  # 過去のline_pixel_sum値を保持するリスト
-HISTORY_LENGTH = 15  # 過去の値をいくつ保持するか
+HISTORY_LENGTH = 20  # 過去の値をいくつ保持するか
 
 gap_number = 0  # 検出しない区間の数
 prev_average_line_pixel_sum = 0  #average_line_pixel_sumの少し過去の値
@@ -26,6 +38,7 @@ prev_average_line_pixel_sum = 0  #average_line_pixel_sumの少し過去の値
 while True:
     clock.tick()
     img = sensor.snapshot().binary([THRESHOLD]) if BINARY_VISIBLE else sensor.snapshot()
+    #img = sensor.snapshot() if BINARY_VISIBLE else sensor.snapshot()
     line = img.get_regression([(255, 255) if BINARY_VISIBLE else THRESHOLD])
 
     line_pixel_sum = 0
@@ -61,7 +74,6 @@ while True:
     prev_average_line_pixel_sum = average_line_pixel_sum
 
     if line:
-        img.draw_line(line.line(), color=127)
 
         line_center_x = (line.x1() + line.x2()) // 2
         x_zure = line_center_x - img.width() // 2
@@ -73,5 +85,6 @@ while True:
 
         uart.write(str((x_zure, theta_left, gap_number)).encode() + b'\n')  # データを文字列として送信
 
+        img.draw_line(line.line(), color=127)
         print(" ずれ = %s, angle = %s, number = %d" % ( x_zure, theta_left, gap_number))
-        #print("FPS %f" % clock.fps())
+        print("FPS %f" % clock.fps())
