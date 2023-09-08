@@ -1,0 +1,104 @@
+BINARY_VISIBLE = True  # 二値化画像を表示するかどうかを制御するフラグ
+
+import sensor, image, time, pyb
+import pyb, ustruct
+from pyb import LED
+
+sensor.reset()
+sensor.set_pixformat(sensor.GRAYSCALE)
+sensor.set_framesize(sensor.QQVGA)
+sensor.skip_frames(time=2000)
+clock = time.clock()
+
+red_led   = LED(1)
+
+THRESHOLD = (60, 250)          #研究室のすぐ近くの廊下で調整
+sensor.set_auto_exposure(False, exposure_us=5000)
+sensor.set_auto_gain(False, gain_db=3)
+
+#THRESHOLD = (60, 150)        #高専の2階で調整
+#sensor.set_auto_exposure(False, exposure_us=4700)
+#sensor.set_auto_gain(False, gain_db=3)
+
+#THRESHOLD = (80, 255)          #夢考房の3階で調整
+#sensor.set_auto_exposure(False, exposure_us=10000)
+#sensor.set_auto_gain(False, gain_db=5)
+
+#THRESHOLD = (50, 255)          #てかてかの体育館 --30cm
+#sensor.set_auto_exposure(False, exposure_us=650)
+#sensor.set_auto_gain(False, gain_db=2)
+
+uart = pyb.UART(1, 115200, timeout=1000)
+uart.init(115200, bits=8, parity=None, stop=1)
+
+space = 0
+
+line_pixel_sum_history = []  # 過去のline_pixel_sum値を保持するリスト
+HISTORY_LENGTH = 20  # 過去の値をいくつ保持するか
+
+gap_number = 0  # 検出しない区間の数
+prev_average_line_pixel_sum = 0  #average_line_pixel_sumの少し過去の値
+
+while True:
+    clock.tick()
+    img1 = sensor.snapshot()
+    red_circle = 0
+    for c in img1.find_circles(threshold = 3500,x_margin = 10, y_margin = 10,r_margin =10):
+        img.draw_circle(c.x(),c.y(),c.r(),color = (255,0,0))
+        red_led.on()
+        time.sleep_ms(500)
+        red_led.off()
+        red_circle = 1
+
+    img = img1.binary([THRESHOLD]) if BINARY_VISIBLE else sensor.snapshot()
+    #img = sensor.snapshot() if BINARY_VISIBLE else sensor.snapshot()
+    line = img.get_regression([(255, 255) if BINARY_VISIBLE else THRESHOLD])
+
+    line_pixel_sum = 0
+    for x in range(img.width()):
+        line_pixel = img.get_pixel(x, 0)  # 最上部の行 (y=0) の画素値を取得
+        line_pixel_sum += line_pixel
+
+        if line_pixel_sum == 0:
+            space += 1
+
+            if space > 100000:
+                line_pixel_sum = 0
+
+        else:
+            line_pixel_sum = 1
+            space = 0
+
+    #print(line_pixel_sum)
+
+    line_pixel_sum_history.append(line_pixel_sum)  # 最新の line_pixel_sum をリストに追加
+
+    if len(line_pixel_sum_history) > HISTORY_LENGTH:
+        line_pixel_sum_history.pop(0)  # 最も古い値を削除
+
+    # 過去の値の平均を計算
+    average_line_pixel_sum = sum(line_pixel_sum_history) / len(line_pixel_sum_history)
+    #print("abc:%f" % average_line_pixel_sum)
+
+    if average_line_pixel_sum <= 0 and prev_average_line_pixel_sum > 0:
+        gap_number += 1
+        #print("変わり目の回数: %d" % gap_number)
+
+    prev_average_line_pixel_sum = average_line_pixel_sum
+
+    if line:
+
+        line_center_x = (line.x1() + line.x2()) // 2
+        x_zure = line_center_x - img.width() // 2
+
+        if line.theta() > 90:
+            theta_left = line.theta() - 180
+        else:
+            theta_left = line.theta()
+
+        uart.write(str((x_zure, theta_left, gap_number, red_circle)).encode())  # データを文字列として送信
+
+        img.draw_line(line.line(), color=127)
+        print(" ずれ = %s, angle = %s, number = %d, circle= %s" % ( x_zure, theta_left, gap_number, red_circle))
+        #print("FPS %f" % clock.fps())
+
